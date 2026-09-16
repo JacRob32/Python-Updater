@@ -19,7 +19,7 @@ The updater checks `/usr/local/bin/python3` by default. Select the menu-bar icon
 defaults write com.example.PythonUpdater PythonExecutablePath -string /opt/homebrew/bin/python3
 ```
 
-The app only accepts the current stable Python 3 release and downloads the `macOS 64-bit universal2 installer` package that python.org publishes for it. It validates the package against python.org's SHA-256 before opening it with Installer.app.
+The app only accepts the current stable Python 3 release and downloads the official HTTPS `.pkg` installer that python.org publishes for it. It validates the package against python.org's SHA-256 before opening it with Installer.app.
 
 ## Local Validation
 

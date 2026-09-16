@@ -47,9 +47,9 @@ final class PythonUpdateManager {
             let release = try await latestRelease()
 
             guard installedVersion < release.version else { return }
+            let installer = try await macOSInstaller(for: release)
             guard askToInstall(version: release.version) else { return }
 
-            let installer = try await macOSInstaller(for: release)
             let packageURL = try await download(installer: installer, version: release.version)
             NSWorkspace.shared.open(packageURL)
         } catch {
@@ -106,7 +106,9 @@ final class PythonUpdateManager {
 
         let files = try JSONDecoder().decode([PythonReleaseFile].self, from: data)
         guard let installer = files.first(where: {
-            $0.url.pathExtension == "pkg" && $0.name.localizedCaseInsensitiveContains("macOS 64-bit universal2 installer")
+            $0.url.scheme == "https" &&
+            $0.url.host == "www.python.org" &&
+            $0.url.pathExtension.lowercased() == "pkg"
         }) else {
             throw UpdateError.noMacOSInstaller(release.version.description)
         }
@@ -224,7 +226,7 @@ private enum UpdateError: LocalizedError {
         switch self {
         case .unreadableInstalledVersion(let path): "Could not read Python at \(path)."
         case .noStableRelease: "No stable Python 3 release was returned by python.org."
-        case .noMacOSInstaller(let version): "No universal macOS installer was found for Python \(version)."
+        case .noMacOSInstaller(let version): "No official macOS installer was found for Python \(version)."
         case .invalidServerResponse: "python.org returned an unexpected response."
         case .checksumMismatch: "The downloaded Python installer did not match its published SHA-256 checksum."
         }

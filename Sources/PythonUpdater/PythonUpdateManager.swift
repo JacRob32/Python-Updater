@@ -2,6 +2,7 @@ import AppKit
 import CryptoKit
 import Foundation
 import ServiceManagement
+import SwiftUI
 
 @MainActor
 final class PythonUpdateManager {
@@ -9,6 +10,9 @@ final class PythonUpdateManager {
 
     private let scheduler = NSBackgroundActivityScheduler(identifier: "com.example.PythonUpdater.check")
     private let defaultPythonPath = "/usr/local/bin/python3"
+    private var updateWindow: NSWindow?
+    private var updateWindowDelegate: WindowCloseDelegate?
+    private var progressWindow: NSWindow?
 
     private init() {}
 
@@ -42,16 +46,15 @@ final class PythonUpdateManager {
     }
 
     private func checkForUpdate() async {
+        guard updateWindow == nil, progressWindow == nil else { return }
+
         do {
             let installedVersion = try installedPythonVersion()
             let release = try await latestRelease()
 
             guard installedVersion < release.version else { return }
             let installer = try await macOSInstaller(for: release)
-            guard askToInstall(version: release.version) else { return }
-
-            let packageURL = try await download(installer: installer, version: release.version)
-            NSWorkspace.shared.open(packageURL)
+            showUpdateWindow(release: release, installer: installer)
         } catch {
             NSLog("Python update check failed: %@", error.localizedDescription)
         }
@@ -116,15 +119,71 @@ final class PythonUpdateManager {
         return installer
     }
 
-    private func askToInstall(version: SemanticVersion) -> Bool {
+    private func showUpdateWindow(release: ResolvedRelease, installer: PythonReleaseFile) {
         NSRunningApplication.current.activate(options: [.activateAllWindows])
 
-        let alert = NSAlert()
-        alert.messageText = "Python update available"
-        alert.informativeText = "A new version of Python \(version) is available. Would you like to download and install it now?"
-        alert.addButton(withTitle: "Update Now")
-        alert.addButton(withTitle: "Cancel")
-        return alert.runModal() == .alertFirstButtonReturn
+        let view = UpdateAvailableView(
+            version: release.version.description,
+            updateNow: { [weak self] in
+                self?.updateWindow?.close()
+                self?.updateWindow = nil
+                Task { @MainActor in
+                    await self?.install(release: release, installer: installer)
+                }
+            },
+            viewOnline: {
+                NSWorkspace.shared.open(release.releasePageURL)
+            },
+            cancel: { [weak self] in
+                self?.updateWindow?.close()
+                self?.updateWindow = nil
+            }
+        )
+        let window = makeWindow(title: "Python Update", content: view, size: NSSize(width: 430, height: 200))
+        let delegate = WindowCloseDelegate { [weak self] in
+            self?.updateWindow = nil
+            self?.updateWindowDelegate = nil
+        }
+        window.delegate = delegate
+        updateWindowDelegate = delegate
+        updateWindow = window
+    }
+
+    private func install(release: ResolvedRelease, installer: PythonReleaseFile) async {
+        showProgressWindow(version: release.version.description)
+
+        do {
+            let packageURL = try await download(installer: installer, version: release.version)
+            progressWindow?.close()
+            progressWindow = nil
+            NSWorkspace.shared.open(packageURL)
+        } catch {
+            progressWindow?.close()
+            progressWindow = nil
+            showError(error)
+        }
+    }
+
+    private func showProgressWindow(version: String) {
+        let view = DownloadProgressView(version: version)
+        progressWindow = makeWindow(title: "Downloading Python", content: view, size: NSSize(width: 360, height: 130), closable: false)
+    }
+
+    private func makeWindow<Content: View>(title: String, content: Content, size: NSSize, closable: Bool = true) -> NSWindow {
+        let style: NSWindow.StyleMask = closable ? [.titled, .closable] : [.titled]
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: style, backing: .buffered, defer: false)
+        window.title = title
+        window.contentView = NSHostingView(rootView: content)
+        window.isReleasedWhenClosed = false
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        return window
+    }
+
+    private func showError(_ error: Error) {
+        NSRunningApplication.current.activate(options: [.activateAllWindows])
+        let alert = NSAlert(error: error)
+        alert.runModal()
     }
 
     private func download(installer: PythonReleaseFile, version: SemanticVersion) async throws -> URL {
@@ -178,6 +237,66 @@ private struct PythonRelease: Decodable {
 private struct ResolvedRelease {
     let id: String
     let version: SemanticVersion
+
+    var releasePageURL: URL {
+        let compactVersion = version.description.replacingOccurrences(of: ".", with: "")
+        return URL(string: "https://www.python.org/downloads/release/python-\(compactVersion)/")!
+    }
+}
+
+private struct UpdateAvailableView: View {
+    let version: String
+    let updateNow: () -> Void
+    let viewOnline: () -> Void
+    let cancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Python \(version) is available")
+                .font(.headline)
+            Text("Would you like to download and install it now?")
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("View Online", action: viewOnline)
+                Spacer()
+                Button("Cancel", action: cancel)
+                Button("Update Now", action: updateNow)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 430, height: 200)
+    }
+}
+
+private struct DownloadProgressView: View {
+    let version: String
+
+    var body: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .controlSize(.regular)
+            Text("Downloading Python \(version)...")
+            Text("The Installer app will open when the download is ready.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(20)
+        .frame(width: 360, height: 130)
+    }
+}
+
+@MainActor
+private final class WindowCloseDelegate: NSObject, NSWindowDelegate {
+    private let onClose: () -> Void
+
+    init(onClose: @escaping () -> Void) {
+        self.onClose = onClose
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        onClose()
+    }
 }
 
 private struct PythonReleaseFile: Decodable {

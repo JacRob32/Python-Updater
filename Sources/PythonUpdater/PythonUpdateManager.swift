@@ -4,14 +4,32 @@ import CryptoKit
 import Foundation
 import ServiceManagement
 
+enum UpdateCheckInterval: String, CaseIterable, Identifiable {
+    case daily = "Daily"
+    case weekly = "Weekly"
+    case monthly = "Monthly"
+
+    var id: String { rawValue }
+
+    var timeInterval: TimeInterval {
+        switch self {
+        case .daily: 24 * 60 * 60
+        case .weekly: 7 * 24 * 60 * 60
+        case .monthly: 30 * 24 * 60 * 60
+        }
+    }
+}
+
 @MainActor
 final class PythonUpdateManager: ObservableObject {
     static let shared = PythonUpdateManager()
 
-    private let scheduler = NSBackgroundActivityScheduler(identifier: "com.example.PythonUpdater.check")
+    private let schedulerIdentifier = "com.example.PythonUpdater.check"
+    private var scheduler: NSBackgroundActivityScheduler
     private let defaultPythonPath = "/usr/local/bin/python3"
     private var availableRelease: ResolvedRelease?
     private var availableInstaller: PythonReleaseFile?
+    private var hasStarted = false
 
     @Published private(set) var installedVersionText = "Not checked"
     @Published private(set) var availableVersionText = ""
@@ -19,11 +37,20 @@ final class PythonUpdateManager: ObservableObject {
     @Published private(set) var activityText = "Checking for updates..."
     @Published private(set) var lastChecked: Date?
     @Published private(set) var updateAvailable = false
+    @Published private(set) var hasChecked = false
     @Published private(set) var isChecking = false
     @Published private(set) var isInstalling = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var loginItemStatusText = "Not registered"
     @Published var editablePythonPath: String
+    @Published var checkInterval: UpdateCheckInterval {
+        didSet {
+            UserDefaults.standard.set(checkInterval.rawValue, forKey: "UpdateCheckInterval")
+            if hasStarted {
+                scheduleBackgroundChecks()
+            }
+        }
+    }
 
     var pythonPath: String {
         let configuredPath = UserDefaults.standard.string(forKey: "PythonExecutablePath")
@@ -31,14 +58,22 @@ final class PythonUpdateManager: ObservableObject {
     }
 
     private init() {
+        scheduler = NSBackgroundActivityScheduler(identifier: schedulerIdentifier)
         editablePythonPath = UserDefaults.standard.string(forKey: "PythonExecutablePath") ?? defaultPythonPath
+        checkInterval = UpdateCheckInterval(rawValue: UserDefaults.standard.string(forKey: "UpdateCheckInterval") ?? "") ?? .daily
     }
 
     func start() {
         registerForLoginItem()
+        hasStarted = true
+        scheduleBackgroundChecks()
+    }
 
-        scheduler.interval = 24 * 60 * 60
-        scheduler.tolerance = 60 * 60
+    private func scheduleBackgroundChecks() {
+        scheduler.invalidate()
+        scheduler = NSBackgroundActivityScheduler(identifier: schedulerIdentifier)
+        scheduler.interval = checkInterval.timeInterval
+        scheduler.tolerance = min(60 * 60, checkInterval.timeInterval / 10)
         scheduler.repeats = true
         scheduler.qualityOfService = .utility
         scheduler.schedule { [weak self] completion in
@@ -118,6 +153,7 @@ final class PythonUpdateManager: ObservableObject {
             let installedVersion = try installedPythonVersion()
             installedVersionText = installedVersion.description
             let release = try await latestRelease()
+            hasChecked = true
 
             guard installedVersion < release.version else {
                 updateAvailable = false

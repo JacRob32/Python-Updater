@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 private struct UpdaterDashboard: View {
     @ObservedObject var manager: PythonUpdateManager
+    @FocusState private var pythonPathIsFocused: Bool
 
     var body: some View {
         ZStack {
@@ -80,6 +81,7 @@ private struct UpdaterDashboard: View {
                                         TextField("/usr/local/bin/python3", text: $manager.editablePythonPath)
                                             .textFieldStyle(.roundedBorder)
                                             .font(.system(.body, design: .monospaced))
+                                            .focused($pythonPathIsFocused)
                                         Button("Save") {
                                             manager.setPythonPath(manager.editablePythonPath)
                                             Task { await manager.checkForUpdatesNow() }
@@ -91,7 +93,18 @@ private struct UpdaterDashboard: View {
 
                             DashboardCard(title: "Automation", systemImage: "clock") {
                                 VStack(alignment: .leading, spacing: 12) {
-                                    DetailRow(label: "Background checks", value: "Every 24 hours")
+                                    HStack {
+                                        Text("Check for updates")
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Picker("Check for updates", selection: $manager.checkInterval) {
+                                            ForEach(UpdateCheckInterval.allCases) { interval in
+                                                Text(interval.rawValue).tag(interval)
+                                            }
+                                        }
+                                        .labelsHidden()
+                                        .frame(width: 120)
+                                    }
                                     DetailRow(label: "Open at Login", value: manager.loginItemStatusText)
                                     if let lastChecked = manager.lastChecked {
                                         DetailRow(label: "Last checked", value: lastChecked.formatted(date: .abbreviated, time: .shortened))
@@ -114,6 +127,9 @@ private struct UpdaterDashboard: View {
                 }
             }
         }
+        .onAppear {
+            pythonPathIsFocused = false
+        }
     }
 }
 
@@ -123,10 +139,10 @@ private struct UpdateSummary: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
-                Image(systemName: manager.updateAvailable ? "arrow.down.circle.fill" : "checkmark.circle.fill")
+                Image(systemName: statusSymbol)
                     .font(.system(size: 22))
-                    .foregroundStyle(manager.updateAvailable ? Color.blue : Color.green)
-                Text(manager.updateAvailable ? "Update Available" : "Update Status")
+                    .foregroundStyle(statusColor)
+                Text(statusTitle)
                     .font(.headline)
                 Spacer()
                 if manager.isChecking || manager.isInstalling {
@@ -134,7 +150,10 @@ private struct UpdateSummary: View {
                 }
             }
 
-            if manager.isChecking || manager.isInstalling {
+            if !manager.hasChecked && !manager.isChecking {
+                Text("Ready to check for the latest official Python release.")
+                    .foregroundStyle(.secondary)
+            } else if manager.isChecking || manager.isInstalling {
                 Text(manager.activityText).foregroundStyle(.secondary)
             } else if manager.updateAvailable {
                 Text("Python \(manager.availableVersionText) is ready to install.")
@@ -160,6 +179,24 @@ private struct UpdateSummary: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(Color.blue.opacity(0.18), lineWidth: 1)
         }
+    }
+
+    private var statusSymbol: String {
+        if manager.updateAvailable { return "arrow.down.circle.fill" }
+        if manager.hasChecked { return "checkmark.circle.fill" }
+        return "info.circle.fill"
+    }
+
+    private var statusColor: Color {
+        if manager.updateAvailable { return .blue }
+        if manager.hasChecked { return .green }
+        return .secondary
+    }
+
+    private var statusTitle: String {
+        if manager.updateAvailable { return "Update Available" }
+        if manager.hasChecked { return "Up to Date" }
+        return "Ready to Check"
     }
 }
 

@@ -8,12 +8,15 @@ version=${VERSION:-1.0}
 bundle_identifier=${BUNDLE_IDENTIFIER:-com.example.PythonUpdater}
 signing_identity=${CODE_SIGN_IDENTITY:--}
 dist_directory="$project_root/dist"
-bundle_path="$dist_directory/$product_name.app"
-staging_directory="$dist_directory/dmg-staging"
+work_directory=$(mktemp -d "${TMPDIR:-/tmp}/PythonUpdater.XXXXXX")
+bundle_path="$work_directory/$product_name.app"
+staging_directory="$work_directory/dmg-staging"
 staged_bundle_path="$staging_directory/$product_name.app"
 dmg_path="$dist_directory/Python-Updater-$version.dmg"
 
-rm -rf "$bundle_path" "$staging_directory" "$dmg_path"
+trap 'rm -rf "$work_directory"' EXIT
+
+rm -f "$dmg_path"
 mkdir -p "$bundle_path/Contents/MacOS" "$bundle_path/Contents/Resources" "$staging_directory"
 
 swiftc \
@@ -49,11 +52,5 @@ codesign --verify --deep --strict --verbose=2 "$staged_bundle_path"
 hdiutil create -volname "$product_name" -srcfolder "$staging_directory" -format UDZO -ov "$dmg_path"
 codesign --force --sign "$signing_identity" --timestamp=none "$dmg_path"
 codesign --verify --verbose=2 "$dmg_path"
-
-# Disk image creation can add Finder metadata to the standalone app bundle.
-xattr -cr "$bundle_path"
-xattr -r -d com.apple.FinderInfo "$bundle_path" 2>/dev/null || true
-codesign --force --sign "$signing_identity" --timestamp=none "$bundle_path"
-codesign --verify --deep --strict --verbose=2 "$bundle_path"
 
 print "Created $dmg_path"

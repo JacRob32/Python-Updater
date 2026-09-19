@@ -49,6 +49,7 @@ xattr -d 'com.apple.fileprovider.fpfs#P' "$staged_bundle_path" 2>/dev/null || tr
 xattr -r -d 'com.apple.fileprovider.fpfs#P' "$staged_bundle_path" 2>/dev/null || true
 codesign --force --sign "$signing_identity" --timestamp=none "$staged_bundle_path"
 codesign --verify --deep --strict --verbose=2 "$staged_bundle_path"
+ln -s /Applications "$staging_directory/Applications"
 hdiutil create -volname "$product_name" -srcfolder "$staging_directory" -format UDZO -ov "$dmg_path"
 codesign --force --sign "$signing_identity" --timestamp=none "$dmg_path"
 codesign --verify --verbose=2 "$dmg_path"

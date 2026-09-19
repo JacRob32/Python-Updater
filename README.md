@@ -5,11 +5,11 @@ Python Updater is a small macOS app that checks the official Python.org releases
 ## Download and Install
 
 1. Download `Python-Updater-1.0.0.dmg` from the latest [GitHub Release](https://github.com/JacRob32/Python-Updater/releases).
-2. Open the downloaded disk image and drag **Python Updater** to your Applications folder.
+2. Open the downloaded disk image and drag **Python Updater** onto the **Applications** shortcut.
 3. Open the app from Applications. macOS may ask you to confirm the first launch.
 4. In the app, check the Python path and select **Check Now**.
 
-The release build is ad-hoc signed for local use. macOS may show a security warning because it is not notarized by Apple. To open it, Control-click **Python Updater** in Applications, select **Open**, then select **Open** again in the confirmation dialog.
+The release build is ad-hoc signed for local use. macOS may show a security warning because it is not notarized by Apple. Try to open the app once, then go to **System Settings > Privacy & Security** and select **Open Anyway** next to the Python Updater security message. Confirm by selecting **Open** in the next dialog.
 
 ## Using the App
 

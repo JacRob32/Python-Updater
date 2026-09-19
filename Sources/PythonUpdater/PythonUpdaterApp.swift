@@ -43,8 +43,7 @@ private struct UpdaterDashboard: View {
             Color.white.ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 16) {
-                    AppIconView()
+                HStack(alignment: .top, spacing: 16) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Python Updater")
                             .font(.system(size: 28, weight: .semibold, design: .rounded))
@@ -52,14 +51,17 @@ private struct UpdaterDashboard: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button {
-                        Task { await manager.checkForUpdatesNow() }
-                    } label: {
-                        Label("Check Now", systemImage: "arrow.clockwise")
+                    VStack(alignment: .trailing, spacing: 12) {
+                        AppIconView()
+                        Button {
+                            Task { await manager.checkForUpdatesNow() }
+                        } label: {
+                            Label("Check Now", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .disabled(manager.isChecking || manager.isInstalling)
+                        .keyboardShortcut("r", modifiers: [.command])
                     }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .disabled(manager.isChecking || manager.isInstalling)
-                    .keyboardShortcut("r", modifiers: [.command])
                 }
                 .padding(28)
 
@@ -241,7 +243,7 @@ private struct AppIconView: View {
                 .interpolation(.high)
                 .scaledToFit()
         }
-        .frame(width: 52, height: 52)
+        .frame(width: 48, height: 48)
         .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
     }
 }

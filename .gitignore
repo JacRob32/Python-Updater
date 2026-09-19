@@ -9,5 +9,8 @@ DerivedData/
 xcuserdata/
 *.xcuserstate
 
+# Distribution output
+dist/
+
 # Logo 
 Untitled.af

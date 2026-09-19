@@ -1,26 +1,40 @@
 # Python Updater
 
-A native macOS dashboard for checking and installing official Python updates. Its menu-bar icon only restores the main app window.
+Python Updater is a small macOS app that checks the official Python.org releases, lets you review an available update, and opens Apple's Installer app to install it. It never asks for your administrator password itself.
 
-## Open in Xcode
+## Using the App
 
-1. In Xcode, create a macOS **App** named `PythonUpdater` with SwiftUI lifecycle and macOS 13 or later as its deployment target.
-2. Replace the generated app source with the files in `Sources/PythonUpdater`.
-3. Use `Supporting Files/Info.plist` as the target's Info.plist and set its bundle identifier to your own reverse-DNS identifier. `LSUIElement` is intentionally absent, so the app appears in the Dock when open.
-4. Add `icon.icns` to the target's **Copy Bundle Resources** build phase. The Info.plist names it as the bundle icon, so it is used by the app and when distributing an `.app` or `.dmg`.
-5. Do not add `LSBackgroundOnly`; the app needs to activate its main window when the menu-bar icon is clicked.
-6. Code-sign the app. `SMAppService.mainApp.register()` then registers the app itself in Login Items on its first launch. Users can manage it in System Settings > General > Login Items.
+1. Open **Python Updater** from Applications. It appears in the Dock while open and adds a small menu-bar icon; clicking that icon brings the app window back.
+2. Under **Installed Python**, confirm the interpreter path. The default is `/usr/local/bin/python3`. Homebrew users will commonly use `/opt/homebrew/bin/python3`.
+3. Click **Check Now**. The app compares your installed version with the latest stable Python 3 release from Python.org.
+4. When an update is available, choose **View Release Notes** or **Install Update**. The app downloads the official macOS package, verifies its SHA-256 checksum, then opens Installer.app.
+5. Choose Daily, Weekly, or Monthly checks under **Automation**. The app also registers itself in macOS Login Items, so scheduled checks continue after you sign in.
 
-## Configuration
+You can manage the Login Item from the app's **Manage Login Items** link or in **System Settings > General > Login Items**.
 
-The updater checks `/usr/local/bin/python3` by default. Open the main app window and select **Check Now** to test the complete update flow on demand. To watch a different interpreter, set the `PythonExecutablePath` user-default value for the app's bundle identifier, for example:
+## Build a DMG
+
+On a Mac with the Xcode Command Line Tools installed, run this from the project folder:
 
 ```sh
-defaults write com.example.PythonUpdater PythonExecutablePath -string /opt/homebrew/bin/python3
+chmod +x Scripts/build-dmg.sh
+Scripts/build-dmg.sh
 ```
 
-The app only accepts the current stable Python 3 release and downloads the official HTTPS `.pkg` installer that python.org publishes for it. It validates the package against python.org's SHA-256 before opening it with Installer.app.
+The finished disk image is written to `dist/Python-Updater-1.0.dmg`. The script creates an application bundle, includes `icon.icns`, signs the app and disk image, and verifies both signatures.
 
-## Local Validation
+By default the script uses an ad-hoc signature. This is useful for local testing and sharing with people who understand macOS security prompts, but it does not satisfy Gatekeeper for public distribution. To distribute outside your own Mac without warnings, build with a Developer ID certificate and notarize the resulting DMG:
 
-Run `swift build` to compile the source package. Xcode uses the same Swift source files, while it supplies the macOS application bundle and the Info.plist.
+```sh
+CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" Scripts/build-dmg.sh
+```
+
+The bundle identifier defaults to `com.example.PythonUpdater`. Replace it for a distributed build:
+
+```sh
+BUNDLE_IDENTIFIER="com.yourcompany.pythonupdater" Scripts/build-dmg.sh
+```
+
+## Technical Details
+
+The app only accepts the current stable Python 3 release and downloads the official HTTPS `.pkg` installer published by Python.org. It validates the downloaded package against Python.org's published SHA-256 checksum before opening it. The app's icon is `icon.icns` and is used by the dashboard, the `.app`, and the generated `.dmg`.

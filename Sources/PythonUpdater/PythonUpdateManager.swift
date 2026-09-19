@@ -23,13 +23,16 @@ final class PythonUpdateManager: ObservableObject {
     @Published private(set) var isInstalling = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var loginItemStatusText = "Not registered"
+    @Published var editablePythonPath: String
 
     var pythonPath: String {
         let configuredPath = UserDefaults.standard.string(forKey: "PythonExecutablePath")
         return configuredPath?.isEmpty == false ? configuredPath! : defaultPythonPath
     }
 
-    private init() {}
+    private init() {
+        editablePythonPath = UserDefaults.standard.string(forKey: "PythonExecutablePath") ?? defaultPythonPath
+    }
 
     func start() {
         registerForLoginItem()
@@ -48,6 +51,19 @@ final class PythonUpdateManager: ObservableObject {
 
     func checkForUpdatesNow() async {
         await checkForUpdate()
+    }
+
+    func setPythonPath(_ path: String) {
+        let trimmedPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        UserDefaults.standard.set(trimmedPath, forKey: "PythonExecutablePath")
+        editablePythonPath = trimmedPath
+        installedVersionText = "Not checked"
+        statusText = "Python path saved. Check for updates to verify it."
+        errorMessage = nil
+    }
+
+    func openLoginItemSettings() {
+        SMAppService.openSystemSettingsLoginItems()
     }
 
     func installAvailableUpdate() async {

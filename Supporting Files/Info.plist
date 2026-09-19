@@ -4,13 +4,13 @@
 <dict>
     <key>CFBundleDisplayName</key>
     <string>Python Updater</string>
+    <key>CFBundleIconFile</key>
+    <string>icon</string>
     <key>CFBundleIdentifier</key>
     <string>com.example.PythonUpdater</string>
     <key>CFBundleName</key>
     <string>Python Updater</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
-    <key>LSUIElement</key>
-    <true/>
 </dict>
 </plist>

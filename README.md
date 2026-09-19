@@ -6,9 +6,9 @@ A native macOS dashboard for checking and installing official Python updates. It
 
 1. In Xcode, create a macOS **App** named `PythonUpdater` with SwiftUI lifecycle and macOS 13 or later as its deployment target.
 2. Replace the generated app source with the files in `Sources/PythonUpdater`.
-3. In the target's **Info** tab, add `Application is agent (UIElement)` and set it to `YES`. This writes `LSUIElement = YES`, keeping the app out of the Dock while it remains available from its menu-bar icon.
-4. Do not add `LSBackgroundOnly`; the app needs to activate its main window when the menu-bar icon is clicked.
-5. Set the bundle identifier in `Supporting Files/Info.plist` to your own reverse-DNS identifier and use that file as the target's Info.plist.
+3. Use `Supporting Files/Info.plist` as the target's Info.plist and set its bundle identifier to your own reverse-DNS identifier. `LSUIElement` is intentionally absent, so the app appears in the Dock when open.
+4. Add `icon.icns` to the target's **Copy Bundle Resources** build phase. The Info.plist names it as the bundle icon, so it is used by the app and when distributing an `.app` or `.dmg`.
+5. Do not add `LSBackgroundOnly`; the app needs to activate its main window when the menu-bar icon is clicked.
 6. Code-sign the app. `SMAppService.mainApp.register()` then registers the app itself in Login Items on its first launch. Users can manage it in System Settings > General > Login Items.
 
 ## Configuration
